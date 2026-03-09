@@ -1,0 +1,46 @@
+// ─────────────────────────────────────────────────────────
+// test.sole  —  SoleScript DSL test program
+// Covers: G1-G16, SR1-SR9
+// ─────────────────────────────────────────────────────────
+
+// G3: Foot declaration (SR5: length + ball_girth mandatory)
+Foot patient_foot {
+    length      : 265 mm
+    ball_girth  : 245 mm
+    width       : 98 mm
+    heel_width  : 62 mm
+    arch_height : 18 mm
+}
+
+// G4: Observations declaration (SR4: pressure_points must be string list)
+Observations clinical_obs {
+    condition       : Diabetic
+    pressure_points : ["heel", "metatarsal", "toe_tip"]
+}
+
+// G5: Last declaration (SR2: reference_foot must point to a declared Foot)
+Last standard_last {
+    reference_foot : patient_foot
+    heel_height    : 22 mm
+    toe_spring     : 10 mm
+    width_fitting  : 98 mm
+}
+
+// G6: Boot declaration with all shoe components (G10)
+// SR9: reference_last must be a validated Last
+Boot orthopedic_boot {
+    reference_last : standard_last
+    Outsole  { }
+    Insole   { }
+    Vamp     { }
+    Tongue   { }
+    Quarter 1 { }
+    ToeBox   { }
+    Heel     { }
+    Shank    { }
+    Counter  { }
+    Lining   { }
+}
+
+// G7: Export — triggers 2D pattern generation (SR2: must reference a Boot)
+Export orthopedic_boot
