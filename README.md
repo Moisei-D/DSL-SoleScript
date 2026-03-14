@@ -338,3 +338,80 @@ The `generated/` directory contains parser code automatically produced by the AN
 - **`SoleScriptVisitor.py`** — Parse tree visitor interface. Implement `visitFoot_decl` (etc.) to compute values during a tree traversal.
 
 The standalone `solescript_parser.py` does not use these files and has no runtime dependency on ANTLR.
+
+---
+
+## VS Code Syntax Highlighting
+
+This repository includes a VS Code language extension in `solescript-vscode/` that adds syntax highlighting for `.sole` files.
+
+### What the extension provides
+
+- Automatic file association for `.sole` files
+- TextMate grammar-based token coloring
+- Basic language configuration (`language-configuration.json`)
+
+### Quick test in Extension Development Host
+
+Use this mode while developing the extension:
+
+1. Open the `solescript-vscode/` folder in VS Code.
+2. Press `F5` to launch an Extension Development Host window.
+3. Open `test.sole` in that new window.
+4. Confirm language mode is `SoleScript` (bottom-right status bar).
+
+### Permanent install in your main VS Code
+
+You can install the extension permanently in either of the following ways.
+
+#### Option A: Build and install a `.vsix` package (recommended for sharing)
+
+Requirements:
+
+- Node.js and npm installed
+- VS Code CLI available (`code` command)
+
+From `solescript-vscode/`:
+
+```bash
+npm install
+npx @vscode/vsce package
+code --install-extension solescript-0.1.0.vsix
+```
+
+After installation, reload VS Code.
+
+#### Option B: Direct local install (no Node.js required)
+
+If npm is not available, copy the extension folder into your user extensions directory.
+
+PowerShell command:
+
+```powershell
+$source = "c:\Users\<your-user>\path\to\DSL-SoleScript\solescript-vscode"
+$target = Join-Path $env:USERPROFILE ".vscode\extensions\solescript-team.solescript-0.1.0"
+New-Item -ItemType Directory -Path $target -Force | Out-Null
+Copy-Item -Path (Join-Path $source "*") -Destination $target -Recurse -Force
+```
+
+Then run: `Developer: Reload Window` in VS Code.
+
+### Verify highlighting is active
+
+1. Open `test.sole`.
+2. Check the status bar language mode shows `SoleScript`.
+3. If needed, click the language mode and select `SoleScript` manually.
+4. Run `Developer: Inspect Editor Tokens and Scopes` to inspect token scopes like `source.sole`.
+
+### Troubleshooting
+
+- No highlighting after install:
+    - Reload VS Code (`Developer: Reload Window`).
+    - Ensure the file extension is exactly `.sole`.
+- Extension not listed in Extensions view:
+    - Confirm `package.json` contains:
+        - `contributes.languages[].id = "solescript"`
+        - `contributes.languages[].extensions` includes `.sole`
+        - `contributes.grammars[].scopeName = "source.sole"`
+- Colors appear too subtle:
+    - Try a different theme; some themes style custom scopes very lightly.
