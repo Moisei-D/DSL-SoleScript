@@ -1,0 +1,26 @@
+{
+  "name": "solescript",
+  "displayName": "SoleScript",
+  "description": "Syntax highlighting for SoleScript orthopedic footwear DSL (.sole files)",
+  "version": "0.1.0",
+  "publisher": "solescript-team",
+  "engines": { "vscode": "^1.75.0" },
+  "categories": ["Programming Languages"],
+  "contributes": {
+    "languages": [
+      {
+        "id": "solescript",
+        "aliases": ["SoleScript", "sole"],
+        "extensions": [".sole"],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "solescript",
+        "scopeName": "source.sole",
+        "path": "./syntaxes/sole.tmLanguage.json"
+      }
+    ]
+  }
+}

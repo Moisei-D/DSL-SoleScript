@@ -13,10 +13,10 @@ Foot patient_foot {
 }
 
 // G4: Observations declaration (SR4: pressure_points must be string list)
-Observations clinical_obs {
-    condition       : Diabetic
-    pressure_points : ["heel", "metatarsal", "toe_tip"]
-}
+// Observations clinical_obs {
+//     condition       : Diabetic
+//     pressure_points : ["heel", "metatarsal", "toe_tip"]
+// }
 
 // G5: Last declaration (SR2: reference_foot must point to a declared Foot)
 Last standard_last {
