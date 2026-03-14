@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1766.6" height="1124.3" viewBox="0 0 1766.6 1124.3">
+  <defs><style>.bg{fill:#f0f4f8}.cell{fill:#ffffff;stroke:#b0c4d8;stroke-width:1}.pat{fill:#d6eaf8;stroke:#1a5276;stroke-width:1.5;stroke-linejoin:round}.hdr{font:bold 15px sans-serif;fill:#1a5276}.meta{font:10px sans-serif;fill:#5d6d7e}.lbl{font:bold 11px sans-serif;fill:#2e4057}</style></defs>
+  <rect width="1766.6" height="1124.3" class="bg"/>
+  <text x="883.3" y="22.0" class="hdr" text-anchor="middle">SoleScript ▸ orthopedic_boot — 2D Component Patterns</text>
+  <text x="883.3" y="41.8" class="meta" text-anchor="middle">length 265.0 mm  ·  width 98.0 mm  ·  ball·girth 245.0 mm  ·  heel·height 22.0 mm</text>
+  <rect x="12.0" y="73.6" width="572.9" height="291.6" rx="5" class="cell"/>
+  <text x="298.4" y="92.3" class="lbl" text-anchor="middle">Outsole</text>
+  <polygon points="548.9,225.2 486.8,270.1 415.3,298.2 353.3,307.6 191.1,290.7 110.0,296.6 71.8,275.2 52.8,247.6 48.0,214.0 52.8,180.3 71.8,152.8 110.0,140.5 167.2,169.0 272.2,184.0 353.3,131.6 510.7,187.8" class="pat"/>
+  <rect x="596.9" y="73.6" width="572.9" height="291.6" rx="5" class="cell"/>
+  <text x="883.3" y="92.3" class="lbl" text-anchor="middle">Insole</text>
+  <polygon points="1133.7,216.2 1071.7,256.8 1000.1,282.2 938.1,290.6 776.0,275.4 694.9,276.5 656.7,258.2 637.6,234.8 632.9,206.0 637.6,177.3 656.7,153.8 694.9,143.4 752.1,165.4 857.0,179.0 938.1,131.6 1095.5,182.4" class="pat"/>
+  <rect x="1181.7" y="73.6" width="572.9" height="291.6" rx="5" class="cell"/>
+  <text x="1468.1" y="92.3" class="lbl" text-anchor="middle">Vamp</text>
+  <polygon points="1217.7,156.3 1217.7,304.5 1409.1,329.2 1409.1,131.6" class="pat"/>
+  <rect x="12.0" y="377.2" width="572.9" height="189.0" rx="5" class="cell"/>
+  <text x="298.4" y="395.9" class="lbl" text-anchor="middle">Tongue</text>
+  <polygon points="48.0,435.2 267.4,445.9 267.4,472.1 48.0,482.8" class="pat"/>
+  <rect x="596.9" y="377.2" width="572.9" height="189.0" rx="5" class="cell"/>
+  <text x="883.3" y="395.9" class="lbl" text-anchor="middle">Quarter 1</text>
+  <polygon points="632.9,435.2 912.8,435.2 912.8,486.6 632.9,530.2" class="pat"/>
+  <rect x="1181.7" y="377.2" width="572.9" height="189.0" rx="5" class="cell"/>
+  <text x="1468.1" y="395.9" class="lbl" text-anchor="middle">Quarter 2</text>
+  <polygon points="1217.7,435.2 1497.7,435.2 1497.7,486.6 1217.7,530.2" class="pat"/>
+  <rect x="12.0" y="578.2" width="572.9" height="277.5" rx="5" class="cell"/>
+  <text x="298.4" y="596.9" class="lbl" text-anchor="middle">Quarter 4</text>
+  <polygon points="48.0,636.2 328.0,636.2 328.0,687.7 48.0,731.2" class="pat"/>
+  <rect x="596.9" y="578.2" width="572.9" height="277.5" rx="5" class="cell"/>
+  <text x="883.3" y="596.9" class="lbl" text-anchor="middle">ToeBox</text>
+  <polygon points="632.9,636.2 807.3,682.1 836.1,727.9 807.3,773.8 632.9,819.7" class="pat"/>
+  <rect x="1181.7" y="578.2" width="572.9" height="277.5" rx="5" class="cell"/>
+  <text x="1468.1" y="596.9" class="lbl" text-anchor="middle">Heel</text>
+  <polygon points="1217.7,636.2 1360.8,636.2 1360.8,764.5 1217.7,764.5" class="pat"/>
+  <rect x="12.0" y="867.7" width="572.9" height="244.6" rx="5" class="cell"/>
+  <text x="298.4" y="886.4" class="lbl" text-anchor="middle">Shank</text>
+  <polygon points="48.0,925.7 329.4,933.6 329.4,957.3 48.0,965.3" class="pat"/>
+  <rect x="596.9" y="867.7" width="572.9" height="244.6" rx="5" class="cell"/>
+  <text x="883.3" y="886.4" class="lbl" text-anchor="middle">Counter</text>
+  <polygon points="670.5,925.7 804.0,925.7 804.0,981.5 670.5,1037.3 636.8,1037.3 632.9,981.5 636.8,925.7" class="pat"/>
+  <rect x="1181.7" y="867.7" width="572.9" height="244.6" rx="5" class="cell"/>
+  <text x="1468.1" y="886.4" class="lbl" text-anchor="middle">Lining</text>
+  <polygon points="1718.6,1005.8 1656.5,1044.2 1585.0,1068.2 1523.0,1076.3 1360.8,1061.8 1279.7,1060.5 1241.5,1043.9 1222.5,1022.4 1217.7,996.2 1222.5,969.9 1241.5,948.5 1279.7,938.9 1337.0,957.7 1441.9,970.5 1523.0,925.7 1680.4,973.7" class="pat"/>
+</svg>

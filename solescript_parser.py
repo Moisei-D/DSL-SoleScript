@@ -25,6 +25,7 @@ When the ANTLR4 tool + runtime ARE available you can instead run:
 """
 
 from __future__ import annotations
+import math
 import re
 import sys
 from dataclasses import dataclass, field
@@ -886,6 +887,418 @@ def parse(source: str) -> tuple[ProgramNode, list[str]]:
 # 9.  CLI / DEMO
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 10.  INTERPRETER
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class Interpreter(ASTVisitor):
+    """
+    Concrete visitor that walks the validated AST, resolves cross-references
+    into runtime Python dicts, and triggers pattern generation on Export.
+    """
+
+    def __init__(self) -> None:
+        self._env: dict = {}
+        self._output_stem: str = "export"
+
+    def run(self, tree: ProgramNode, output_stem: str = "export") -> None:
+        """Execute the full program AST.  Must be called after SemanticAnalyzer passes."""
+        self._output_stem = output_stem
+        self.visit(tree)
+
+    # ------------------------------------------------------------------
+    # Value evaluation helpers
+    # ------------------------------------------------------------------
+
+    def _eval(self, value: Any) -> Any:
+        if isinstance(value, DimensionValueNode):
+            return value.number * (10.0 if value.unit == "cm" else 1.0)
+        if isinstance(value, IdValueNode):
+            return self._env.get(value.name, value.name)
+        if isinstance(value, StringListValueNode):
+            return list(value.values)
+        if isinstance(value, KeywordValueNode):
+            return value.keyword
+        return None
+
+    def _eval_attrs(self, attr_list: list) -> dict:
+        return {e.key: self._eval(e.value) for e in attr_list}
+
+    # ------------------------------------------------------------------
+    # Declaration visitors — populate _env
+    # ------------------------------------------------------------------
+
+    def visit_FootDeclNode(self, node: FootDeclNode) -> None:
+        obj = self._eval_attrs(node.attr_list)
+        obj["__type__"] = "Foot"
+        self._env[node.name] = obj
+
+    def visit_ObsDeclNode(self, node: ObsDeclNode) -> None:
+        obj = self._eval_attrs(node.attr_list)
+        obj["__type__"] = "Observations"
+        self._env[node.name] = obj
+
+    def visit_LastDeclNode(self, node: LastDeclNode) -> None:
+        obj = self._eval_attrs(node.attr_list)
+        obj["__type__"] = "Last"
+        self._env[node.name] = obj
+
+    def visit_BootDeclNode(self, node: BootDeclNode) -> None:
+        obj = self._eval_attrs(node.attr_list)
+        obj["__type__"] = "Boot"
+        obj["components"] = [c.component for c in node.comp_list]
+        self._env[node.name] = obj
+
+    # ------------------------------------------------------------------
+    # Export visitor — trigger backend
+    # ------------------------------------------------------------------
+
+    def visit_ExportDeclNode(self, node: ExportDeclNode) -> None:
+        boot = self._env.get(node.name)
+        if not isinstance(boot, dict):
+            raise RuntimeError(f"Export: '{node.name}' not found in environment.")
+        # Resolve reference chain:  Boot → Last → Foot
+        last_ref = boot.get("reference_last")
+        last = (self._env.get(last_ref, {})
+                if isinstance(last_ref, str) else (last_ref or {}))
+        foot_ref = last.get("reference_foot")
+        foot = (self._env.get(foot_ref, {})
+                if isinstance(foot_ref, str) else (foot_ref or {}))
+
+        gen      = PatternGenerator(foot, last, boot)
+        patterns = gen.generate()
+
+        out_path = f"{self._output_stem}_patterns.svg"
+        SVGExporter.export(patterns, out_path, foot, last, node.name)
+        print(f"  \u2713  {len(patterns)} pattern(s) written \u2192 '{out_path}'")
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 11.  PATTERN GENERATOR
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class PatternGenerator:
+    """
+    Computes approximate 2-D flat-pattern polygons for every shoe component
+    declared in a Boot block.
+
+    Coordinate system (all values in mm):
+        Origin  = heel centre, posterior end
+        +X      = towards toe (anterior)
+        +Y      = lateral (outer / fibular) side
+        -Y      = medial (inner / tibial / arch) side
+    """
+
+    def __init__(self, foot: dict, last: dict, boot: dict) -> None:
+        self.L   = float(foot.get("length",        260.0))
+        self.W   = float(foot.get("width",           95.0))   # full width at ball
+        self.HW  = float(foot.get("heel_width",      60.0))   # full heel width
+        self.AH  = float(foot.get("arch_height",     15.0))
+        self.HH  = float(last.get("heel_height",     20.0))
+        self.TS  = float(last.get("toe_spring",       8.0))
+        self.WF  = float(last.get("width_fitting",  self.W))
+        self.components: List[str] = boot.get("components", [])
+        self._bx: float = 0.59 * self.L   # ball-of-foot X position
+
+    # ------------------------------------------------------------------
+    # Public
+    # ------------------------------------------------------------------
+
+    def generate(self) -> dict:
+        """Return {component_name: [(x, y), ...]} for every declared component."""
+        dispatch = {
+            "Outsole": self._outsole,
+            "Insole":  self._insole,
+            "Lining":  self._lining,
+            "Shank":   self._shank,
+            "Heel":    self._heel_block,
+            "Counter": self._counter,
+            "ToeBox":  self._toebox,
+            "Vamp":    self._vamp,
+            "Tongue":  self._tongue,
+        }
+        patterns: dict = {}
+        for comp in self.components:
+            base = comp.split()[0]
+            if base == "Quarter":
+                num = int(comp.split()[1]) if len(comp.split()) > 1 else 1
+                patterns[comp] = self._quarter(num)
+            elif base in dispatch:
+                patterns[comp] = dispatch[base]()
+        return patterns
+
+    # ------------------------------------------------------------------
+    # Shared plantar foot outline
+    # ------------------------------------------------------------------
+
+    def _foot_pts(self, inset: float = 0.0) -> List[tuple]:
+        """
+        Approximate plantar footprint polygon.
+        inset > 0  ->  smaller (e.g. insole),  inset < 0  ->  larger (e.g. outsole border).
+        """
+        L  = self.L
+        W  = self.W  / 2 - inset
+        HW = self.HW / 2 - inset
+        bx = self._bx
+        right_side = [
+            (L,       +W  * 0.12),
+            (0.87*L,  +W  * 0.60),
+            (0.72*L,  +W  * 0.90),
+            (bx,      +W        ),
+            (0.25*L,  +W  * 0.82),
+            (0.08*L,  +HW * 1.35),
+            (0.0,     +HW       ),
+        ]
+        heel_arc = [
+            (-0.04*L, +HW * 0.55),
+            (-0.05*L,  0.0      ),
+            (-0.04*L, -HW * 0.55),
+        ]
+        left_side = [
+            (0.0,     -HW       ),
+            (0.08*L,  -HW * 1.20),
+            (0.20*L,  -W  * 0.48),
+            (0.42*L,  -W  * 0.32),
+            (bx,      -W  * 0.88),
+            (0.92*L,  -W  * 0.28),
+        ]
+        return right_side + heel_arc + left_side
+
+    # ------------------------------------------------------------------
+    # Component generators
+    # ------------------------------------------------------------------
+
+    def _outsole(self) -> List[tuple]:
+        return self._foot_pts(inset=-3.0)
+
+    def _insole(self) -> List[tuple]:
+        return self._foot_pts(inset=2.0)
+
+    def _lining(self) -> List[tuple]:
+        return self._foot_pts(inset=4.5)
+
+    def _shank(self) -> List[tuple]:
+        """Narrow arch-support plate from heel to ball."""
+        bx = self._bx
+        hw = 11.0
+        return [
+            (0.0,  -hw       ),
+            (bx,   -hw * 0.6 ),
+            (bx,   +hw * 0.6 ),
+            (0.0,  +hw       ),
+        ]
+
+    def _heel_block(self) -> List[tuple]:
+        """Heel block developed flat as a rectangle."""
+        w = self.HW * 1.15
+        d = self.L  * 0.30
+        return [
+            (0.0, 0.0),
+            (d,   0.0),
+            (d,   w  ),
+            (0.0, w  ),
+        ]
+
+    def _counter(self) -> List[tuple]:
+        """Heel counter stiffener — asymmetric trapezoid developed flat."""
+        HW = self.HW
+        lh = self.HH * 0.85
+        mh = self.HH * 0.95
+        d  = self.L  * 0.28
+        return [
+            ( 0.0,  0.0      ),
+            ( d,    0.0      ),
+            ( d,    HW * 0.5 ),
+            ( 0.0,  HW       ),
+            (-lh,   HW       ),
+            (-mh,   HW * 0.5 ),
+            (-lh,   0.0      ),
+        ]
+
+    def _toebox(self) -> List[tuple]:
+        """Toe cap — oval strip over the toe area."""
+        W  = self.W
+        bx = self._bx
+        L  = self.L
+        hw = W  * 0.52
+        d  = (L - bx) * 0.80 + self.TS
+        th = 16.0
+        return [
+            (0.0,      -hw        ),
+            (d,        -hw * 0.50 ),
+            (d + th,    0.0       ),
+            (d,        +hw * 0.50 ),
+            (0.0,      +hw        ),
+        ]
+
+    def _vamp(self) -> List[tuple]:
+        """Main front upper panel — trapezoidal flat development."""
+        bx = self._bx
+        W  = self.W
+        th = W  * 0.42
+        bh = W  * 0.56
+        h  = bx * 0.68
+        return [
+            (0.0, -th),
+            (0.0, +th),
+            (h,   +bh),
+            (h,   -bh),
+        ]
+
+    def _tongue(self) -> List[tuple]:
+        """Tongue — tapered panel."""
+        L   = self.L
+        tw  = self.W  * 0.27
+        th  = L       * 0.46
+        tip = tw      * 0.55
+        return [
+            (0.0,  -tw / 2),
+            (th,   -tip / 2),
+            (th,   +tip / 2),
+            (0.0,  +tw / 2),
+        ]
+
+    def _quarter(self, side: int = 1) -> List[tuple]:
+        """
+        Quarter side panel.  side=1 -> lateral,  side=2 -> medial.
+        Trapezoid, developed flat.
+        """
+        L       = self.L
+        bx      = self._bx
+        HH      = self.HH
+        h_back  = HH * 2.40
+        h_front = HH * 1.30
+        width   = L - bx + bx * 0.30
+        return [
+            (0.0,   0.0    ),
+            (width, 0.0    ),
+            (width, h_front),
+            (0.0,   h_back ),
+        ]
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 12.  SVG EXPORTER
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class SVGExporter:
+    """Renders 2-D component patterns to an SVG file in a labelled grid layout."""
+
+    COLS    = 3      # components per grid row
+    PAD     = 20.0   # cell inner padding (mm, pre-scale)
+    GAP     = 12.0   # gap between grid cells (px)
+    SCALE   = 1.8    # mm -> SVG user units (px)
+    TITLE_H = 22.0   # reserved height for component name label (px)
+
+    @classmethod
+    def export(
+        cls,
+        patterns: dict,
+        path: str,
+        foot: dict,
+        last: dict,
+        boot_name: str = "boot",
+    ) -> None:
+        S   = cls.SCALE
+        PAD = cls.PAD * S
+        GAP = cls.GAP
+        TH  = cls.TITLE_H
+
+        # --- normalise each polygon to (0, 0) origin and compute cell size ---
+        cells: list = []
+        for name, pts in patterns.items():
+            if not pts:
+                continue
+            xs = [p[0] for p in pts]
+            ys = [p[1] for p in pts]
+            minx, maxx = min(xs), max(xs)
+            miny, maxy = min(ys), max(ys)
+            norm = [((x - minx) * S, (y - miny) * S) for x, y in pts]
+            cw   = (maxx - minx) * S + 2 * PAD
+            ch   = (maxy - miny) * S + 2 * PAD + TH
+            cells.append((name, norm, cw, ch))
+
+        if not cells:
+            print("  \u26a0  No patterns to export.")
+            return
+
+        cols = cls.COLS
+        rows = (len(cells) + cols - 1) // cols
+
+        col_ws = [0.0] * cols
+        row_hs = [0.0] * rows
+        for i, (_, _, cw, ch) in enumerate(cells):
+            col_ws[i % cols]  = max(col_ws[i % cols],  cw)
+            row_hs[i // cols] = max(row_hs[i // cols], ch)
+
+        header = TH * 2.8
+        svg_w  = sum(col_ws) + GAP * (cols + 1)
+        svg_h  = sum(row_hs) + GAP * (rows + 1) + header
+
+        out: list = []
+        out.append('<?xml version="1.0" encoding="UTF-8"?>')
+        out.append(
+            f'<svg xmlns="http://www.w3.org/2000/svg" '
+            f'width="{svg_w:.1f}" height="{svg_h:.1f}" '
+            f'viewBox="0 0 {svg_w:.1f} {svg_h:.1f}">'
+        )
+        out.append(
+            '  <defs><style>'
+            '.bg{fill:#f0f4f8}'
+            '.cell{fill:#ffffff;stroke:#b0c4d8;stroke-width:1}'
+            '.pat{fill:#d6eaf8;stroke:#1a5276;stroke-width:1.5;stroke-linejoin:round}'
+            '.hdr{font:bold 15px sans-serif;fill:#1a5276}'
+            '.meta{font:10px sans-serif;fill:#5d6d7e}'
+            '.lbl{font:bold 11px sans-serif;fill:#2e4057}'
+            '</style></defs>'
+        )
+        out.append(f'  <rect width="{svg_w:.1f}" height="{svg_h:.1f}" class="bg"/>')
+        out.append(
+            f'  <text x="{svg_w/2:.1f}" y="{TH:.1f}" '
+            f'class="hdr" text-anchor="middle">'
+            f'SoleScript \u25b8 {boot_name} \u2014 2D Component Patterns</text>'
+        )
+        meta = (
+            f"length {foot.get('length', '?')} mm  \u00b7  "
+            f"width {foot.get('width', '?')} mm  \u00b7  "
+            f"ball\u00b7girth {foot.get('ball_girth', '?')} mm  \u00b7  "
+            f"heel\u00b7height {last.get('heel_height', '?')} mm"
+        )
+        out.append(
+            f'  <text x="{svg_w/2:.1f}" y="{TH*1.9:.1f}" '
+            f'class="meta" text-anchor="middle">{meta}</text>'
+        )
+
+        for i, (name, pts, cw, ch) in enumerate(cells):
+            c   = i % cols
+            r   = i // cols
+            cx  = GAP + sum(col_ws[:c]) + GAP * c
+            cy  = header + GAP + sum(row_hs[:r]) + GAP * r
+            ccw = col_ws[c]
+            cch = row_hs[r]
+            ox  = cx + PAD
+            oy  = cy + PAD + TH
+            out.append(
+                f'  <rect x="{cx:.1f}" y="{cy:.1f}" '
+                f'width="{ccw:.1f}" height="{cch:.1f}" rx="5" class="cell"/>'
+            )
+            out.append(
+                f'  <text x="{cx + ccw/2:.1f}" y="{cy + TH*0.85:.1f}" '
+                f'class="lbl" text-anchor="middle">{name}</text>'
+            )
+            pts_str = " ".join(f"{ox+px:.1f},{oy+py:.1f}" for px, py in pts)
+            out.append(f'  <polygon points="{pts_str}" class="pat"/>')
+
+        out.append("</svg>")
+        with open(path, "w", encoding="utf-8") as fh:
+            fh.write("\n".join(out))
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 9.  CLI / DEMO
+# ═══════════════════════════════════════════════════════════════════════════════
+
 _DEMO_PROGRAM = """\
 // Step 1: patient foot measurements
 Foot patient_foot {
@@ -950,6 +1363,10 @@ def main() -> None:
         sys.exit(1)
     else:
         print("  ✓  All semantic rules passed (SR1-SR9).")
+
+    print("\n── Pattern Generation ──")
+    stem = sys.argv[1].rsplit(".", 1)[0] if len(sys.argv) > 1 else "demo"
+    Interpreter().run(ast, output_stem=stem)
 
     print("\n── Token Stream (first 30) ──")
     lexer  = SoleScriptLexer(source)
